@@ -64,4 +64,4 @@ def main():
 if __name__ == "__main__":
     np.random.seed(42)
     main()
-    plt.savefig("RegressionVisualzation.png") 
+    plt.savefig("RegressionVisualization.png") 
