@@ -11,6 +11,8 @@ import matplotlib.pyplot as plt
 from dataclasses import dataclass, field
 from typing import Union
 
+np.seterr(all="ignore")
+
 @dataclass(frozen=False, order=True)
 class LinearRegression:
     
@@ -31,7 +33,18 @@ class LinearRegression:
         self.__err = 0
         for sample, truth in zip(self.__X, self.__y): # sum( (y_pred(i)-y_truth(i))*x(i) )
             self.__err += self.__squaredError(sample, truth)*sample # (y_pred(i)-y_truth(i))*x(i)
-        self.__weights -= self.learning_rate/self.__X.shape[0]*self.__err # Theta_i(j+1) = Theta_i(j) - lr/n*sum( (y_pred(i)-y_truth(i))*x(i) )
+        self.__weights -= self.learning_rate/self.__X.shape[0]*self.__err + self.learning_rate*self.__ridge_() + self.learning_rate*self.__lasso_() # Theta_i(j+1) = Theta_i(j) - lr/n*sum( (y_pred(i)-y_truth(i))*x(i) )
+        self.__weights[-1] -= self.learning_rate*self.__ridge_()[-1] + self.learning_rate*self.__lasso_()[-1] # Do Not Update Theta_0!# Do Not Update Theta_0!
+
+    def __lasso_(self) -> np.ndarray:
+        if np.isnan(self.__weights/np.abs(self.__weights)).sum() == 0: 
+            return (self.lasso/self.__X.shape[0])*(self.__weights/np.abs(self.__weights))
+        else:
+            return (self.lasso/self.__X.shape[0])*np.nan_to_num(self.__weights/np.abs(self.__weights), nan=1)
+    
+    def __ridge_(self) -> np.ndarray:
+        return (self.ridge/self.__X.shape[0])*self.__weights
+
 
     def __squaredError(self, features:np.ndarray, y_truth:float) -> float:
 
@@ -73,19 +86,31 @@ def main():
     rowNum = 2
     colNum = 5
     dataset = CreateDataset(sampleSize=25, dimSize=1)
-    fig, ax = plt.subplots(2,5,figsize=(colNum*4,rowNum*4),)
+    fig, ax = plt.subplots(rowNum,colNum,figsize=(colNum*4,rowNum*4),)
     X = dataset[:,:-1]
     y = dataset[:,-1]
     iter = 0
     for i in range(rowNum):
         for j in range(colNum):
             model = LinearRegression(iteration_num=iter, learning_rate=0.001)
+            model_ridge = LinearRegression(iteration_num=iter, learning_rate=0.001, ridge=300)
+            model_lasso = LinearRegression(iteration_num=iter, learning_rate=0.001, lasso=300) 
+
             model.fit(X,y)
+            model_ridge.fit(X,y)
+            model_lasso.fit(X,y)
+
             preds = model.predict(X)
+            model_ridge_preds = model_ridge.predict(X)
+            model_lasso_preds = model_lasso.predict(X)
+
             ax[i][j].scatter(X,y)
-            ax[i][j].plot(X, preds, color="r", label=f"RMSE:{round(rootMeanSquaredError(y,preds), 2)}")
+            ax[i][j].plot(X, preds, color="r", label=f"W/O Regularization RMSE:{round(rootMeanSquaredError(y,preds), 2)}")
+            ax[i][j].plot(X, model_ridge_preds, color="g", label=f"L2 Regularization RMSE:{round(rootMeanSquaredError(y,model_ridge_preds), 2)}")
+            ax[i][j].plot(X, model_lasso_preds, color="y", label=f"L1 Regularization RMSE:{round(rootMeanSquaredError(y,model_lasso_preds), 2)}")
+
             ax[i][j].set_title(f"Iteration Num: {iter}")
-            ax[i][j].legend(loc="upper left")
+            ax[i][j].legend(loc="upper left", fontsize=6)
             iter += 1
     return ax
 
